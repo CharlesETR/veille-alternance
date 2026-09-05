@@ -1,0 +1,53 @@
+name: Veille offres vers Telegram
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub interprets this schedule in UTC. Four runs per day also limit the
+    # impact of occasional delayed scheduled runs.
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  chercher-et-notifier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer la mémoire des annonces
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer le programme
+        run: pip install -r requirements.txt
+
+      - name: Chercher et envoyer les nouvelles annonces
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEARCH_LOCATION: ${{ secrets.SEARCH_LOCATION }}
+          SEARCH_LATITUDE: ${{ secrets.SEARCH_LATITUDE }}
+          SEARCH_LONGITUDE: ${{ secrets.SEARCH_LONGITUDE }}
+          SEARCH_RADIUS_KM: ${{ secrets.SEARCH_RADIUS_KM }}
+          EXCLUDED_KEYWORDS: ${{ secrets.EXCLUDED_KEYWORDS }}
+          FRANCE_TRAVAIL_CLIENT_ID: ${{ secrets.FRANCE_TRAVAIL_CLIENT_ID }}
+          FRANCE_TRAVAIL_CLIENT_SECRET: ${{ secrets.FRANCE_TRAVAIL_CLIENT_SECRET }}
+          LBA_API_KEY: ${{ secrets.LBA_API_KEY }}
+          LBA_CALLER: ${{ secrets.LBA_CALLER }}
+          INDEED_IMAP_HOST: ${{ secrets.INDEED_IMAP_HOST }}
+          INDEED_IMAP_PORT: ${{ secrets.INDEED_IMAP_PORT }}
+          INDEED_IMAP_USERNAME: ${{ secrets.INDEED_IMAP_USERNAME }}
+          INDEED_IMAP_APP_PASSWORD: ${{ secrets.INDEED_IMAP_APP_PASSWORD }}
+        run: python jobs_to_telegram.py
+
+      - name: Mémoriser les annonces déjà envoyées
+        run: |
+          git config user.name "veille-offres[bot]"
+          git config user.email "veille-offres[bot]@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || git commit -m "Mise à jour des annonces déjà envoyées"
+          git push
